@@ -1,0 +1,56 @@
+from pathlib import Path
+from pydantic import BaseModel, Field
+import json
+import csv
+
+class JsonToCsvConfig(BaseModel):
+    input_json: Path = Field(..., description="Path to input JSON file")
+    output_csv: Path = Field(default=Path("output.csv"), description="Path for output CSV file")
+    clean_garbage: bool = Field(default=True, description="Remove empty or null values from rows")
+
+def convert_json_to_csv(config: JsonToCsvConfig) -> int:
+    if not config.input_json.exists():
+        print(f"File {config.input_json} not found.")
+        return 0
+
+    with open(config.input_json, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    if isinstance(data, dict):
+        data = [data]
+
+    if not data:
+        print("JSON file is empty.")
+        return 0
+
+    # Clean garbage (remove keys with None, empty strings, or strip whitespaces)
+    cleaned_data = []
+    for item in data:
+        if config.clean_garbage:
+            cleaned_item = {
+                k: (v.strip() if isinstance(v, str) else v) 
+                for k, v in item.items() 
+                if v is not None and v != ""
+            }
+        else:
+            cleaned_item = item
+        cleaned_data.append(cleaned_item)
+
+    # Collect all unique fields across items
+    fields = list(dict.fromkeys(key for row in cleaned_data for key in row.keys()))
+
+    with open(config.output_csv, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fields, restval="")
+        writer.writeheader()
+        writer.writerows(cleaned_data)
+
+    print(f"Converted and cleaned {len(cleaned_data)} rows to {config.output_csv}")
+    return len(cleaned_data)
+
+if __name__ == "__main__":
+    config = JsonToCsvConfig(input_json=Path("data.json"))
+    convert_json_to_csv(config)
+==========================================================================================================================================
+#If you want to: customize/upgrade/just dont wanna to set it by yourself, or if you want to integrate it to your another project, text me.
+#Telegram for work: @Myhamed91
+==========================================================================================================================================
